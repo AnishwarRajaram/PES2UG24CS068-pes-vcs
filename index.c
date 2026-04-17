@@ -135,11 +135,40 @@ int index_status(const Index *index) {
 //
 // Returns 0 on success, -1 on error.
 int index_load(Index *index) {
-    // TODO: Implement index loading
-    // (See Lab Appendix for logical steps)
-    (void)index;
-    return -1;
+    memset(index, 0, sizeof(Index));
+    FILE *fp = fopen(".pes/index", "rb");
+    if (!fp) return 0; // No index yet
+
+    if (fread(&index->count, sizeof(int), 1, fp) != 1) {
+        fclose(fp);
+        return -1;
+    }
+
+    for (int i = 0; i < index->count && i < MAX_INDEX_ENTRIES; i++) {
+        IndexEntry *entry = &index->entries[i];
+        if (fread(&entry->mode, sizeof(uint32_t), 1, fp) != 1 ||
+            fread(entry->hash.hash, HASH_SIZE, 1, fp) != 1) {
+            fclose(fp);
+            return -1;
+        }
+
+        uint16_t path_len;
+        if (fread(&path_len, sizeof(uint16_t), 1, fp) != 1 ||
+            path_len >= sizeof(entry->path)) {
+            fclose(fp);
+            return -1;
+        }
+
+        if (fread(entry->path, 1, path_len, fp) != path_len) {
+            fclose(fp);
+            return -1;
+        }
+        entry->path[path_len] = '\0';
+    }
+    fclose(fp);
+    return 0;
 }
+
 
 // Save the index to .pes/index atomically.
 //
@@ -152,11 +181,63 @@ int index_load(Index *index) {
 //
 // Returns 0 on success, -1 on error.
 int index_save(const Index *index) {
-    // TODO: Implement atomic index saving
-    // (See Lab Appendix for logical steps)
-    (void)index;
-    return -1;
+    
+    mkdir(".pes", 0755);
+    
+    
+    char temp_path[512];
+    snprintf(temp_path, sizeof(temp_path), ".pes/index.tmp");
+    
+    FILE *fp = fopen(temp_path, "w");
+    if (!fp) {
+        return -1;
+    }
+    
+    
+    Index sorted_index = *index;
+    qsort(sorted_index.entries, sorted_index.count, sizeof(IndexEntry), compare_index_entries);
+    
+    
+    for (int i = 0; i < sorted_index.count; i++) {
+        const IndexEntry *entry = &sorted_index.entries[i];
+        
+        // Convert hash to hex
+        char hash_hex[HASH_HEX_SIZE + 1];
+        hash_to_hex(&entry->hash, hash_hex);
+        
+        
+        fprintf(fp, "%u %s %lu %u %s\n", 
+                entry->mode, 
+                hash_hex, 
+                entry->mtime_sec, 
+                entry->size, 
+                entry->path);
+    }
+    
+    
+    fflush(fp);
+    int fd = fileno(fp);
+    if (fd >= 0) {
+        fsync(fd);
+    }
+    fclose(fp);
+    
+    
+    if (rename(temp_path, ".pes/index") != 0) {
+        unlink(temp_path);
+        return -1;
+    }
+    
+    
+    int dir_fd = open(".pes", O_RDONLY);
+    if (dir_fd >= 0) {
+        fsync(dir_fd);
+        close(dir_fd);
+    }
+    
+    return 0;
 }
+
 
 // Stage a file for the next commit.
 //

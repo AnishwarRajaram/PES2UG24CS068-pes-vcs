@@ -135,40 +135,6 @@ int tree_serialize(const Tree *tree, void **data_out, size_t *len_out) {
 // Returns 0 on success, -1 on error.
 
 // ─── TODO: Implement these ──────────────────────────────────────────────────
-int index_load(Index *index) {
-    memset(index, 0, sizeof(Index));
-    FILE *fp = fopen(".pes/index", "rb");
-    if (!fp) return 0; // No index yet
-
-    if (fread(&index->count, sizeof(int), 1, fp) != 1) {
-        fclose(fp);
-        return -1;
-    }
-
-    for (int i = 0; i < index->count && i < MAX_INDEX_ENTRIES; i++) {
-        IndexEntry *entry = &index->entries[i];
-        if (fread(&entry->mode, sizeof(uint32_t), 1, fp) != 1 ||
-            fread(entry->hash.hash, HASH_SIZE, 1, fp) != 1) {
-            fclose(fp);
-            return -1;
-        }
-
-        uint16_t path_len;
-        if (fread(&path_len, sizeof(uint16_t), 1, fp) != 1 ||
-            path_len >= sizeof(entry->path)) {
-            fclose(fp);
-            return -1;
-        }
-
-        if (fread(entry->path, 1, path_len, fp) != path_len) {
-            fclose(fp);
-            return -1;
-        }
-        entry->path[path_len] = '\0';
-    }
-    fclose(fp);
-    return 0;
-}
 
 static int write_tree_level(IndexEntry *entries, int count, const char *base_path, int base_len, ObjectID *id_out) {
     if (count == 0) return -1;
