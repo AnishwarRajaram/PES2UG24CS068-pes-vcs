@@ -23,6 +23,8 @@
 #define MODE_EXEC      0100755
 #define MODE_DIR       0040000
 
+static int compare_tree_entries(const void *a, const void *b);
+
 // ─── PROVIDED ───────────────────────────────────────────────────────────────
 
 // Determine the object mode for a filesystem path.
@@ -131,6 +133,9 @@ int tree_serialize(const Tree *tree, void **data_out, size_t *len_out) {
 //
 // Returns 0 on success, -1 on error.
 
+#include "index.h"
+
+
 static int write_tree_level(IndexEntry *entries, int count, const char *base_path, int base_len, ObjectID *id_out) {
     if (count == 0) return -1;
     
@@ -138,29 +143,29 @@ static int write_tree_level(IndexEntry *entries, int count, const char *base_pat
     tree.count = 0;
     
     int i = 0;
-    while (i < count) {
-        const char *path = entries[i].path;
+    while (i < count && tree.count < MAX_TREE_ENTRIES) {
+        const char *path = entries[i].name;
         const char *relative = path + base_len;
-        
         
         if (*relative == '/') relative++;
         
         const char *next_slash = strchr(relative, '/');
+        
         if (next_slash == NULL) {
-            
             TreeEntry *entry = &tree.entries[tree.count++];
             entry->mode = entries[i].mode;
             memcpy(&entry->hash, &entries[i].hash, sizeof(ObjectID));
-            strncpy(entry->name, relative, sizeof(entry->name) - 1);
-            entry->name[sizeof(entry->name) - 1] = '\0';
+            size_t name_len = strlen(relative);
+            if (name_len >= sizeof(entry->name)) name_len = sizeof(entry->name) - 1;
+            memcpy(entry->name, relative, name_len);
+            entry->name[name_len] = '\0';
             i++;
         } else {
-            
             int name_len = next_slash - relative;
             char dir_name[256];
-            strncpy(dir_name, relative, name_len);
+            if (name_len >= (int)sizeof(dir_name)) name_len = sizeof(dir_name) - 1;
+            memcpy(dir_name, relative, name_len);
             dir_name[name_len] = '\0';
-            
             
             int subdir_count = 0;
             int start_idx = i;
@@ -169,7 +174,7 @@ static int write_tree_level(IndexEntry *entries, int count, const char *base_pat
             int subdir_len = strlen(subdir_path);
             
             while (i < count) {
-                const char *check_path = entries[i].path + base_len;
+                const char *check_path = entries[i].name + base_len;
                 if (*check_path == '/') check_path++;
                 
                 if (strncmp(check_path, dir_name, name_len) == 0 && 
@@ -180,22 +185,23 @@ static int write_tree_level(IndexEntry *entries, int count, const char *base_pat
                     break;
                 }
             }
+            
             ObjectID subtree_id;
             if (write_tree_level(entries + start_idx, subdir_count, subdir_path, subdir_len, &subtree_id) != 0) {
                 return -1;
             }
             
-            
             TreeEntry *entry = &tree.entries[tree.count++];
             entry->mode = MODE_DIR;
             memcpy(&entry->hash, &subtree_id, sizeof(ObjectID));
-            strncpy(entry->name, dir_name, sizeof(entry->name) - 1);
-            entry->name[sizeof(entry->name) - 1] = '\0';
+            size_t dir_name_len = strlen(dir_name);
+            if (dir_name_len >= sizeof(entry->name)) dir_name_len = sizeof(entry->name) - 1;
+            memcpy(entry->name, dir_name, dir_name_len);
+            entry->name[dir_name_len] = '\0';
         }
     }
-
-    qsort(tree.entries, tree.count, sizeof(TreeEntry), compare_tree_entries);
     
+    qsort(tree.entries, tree.count, sizeof(TreeEntry), compare_tree_entries);
     
     void *tree_data;
     size_t tree_len;
@@ -207,20 +213,21 @@ static int write_tree_level(IndexEntry *entries, int count, const char *base_pat
     free(tree_data);
     
     return result;
-    return 0;
 }
+
 int tree_from_index(ObjectID *id_out) {
-    IndexEntry *entries = NULL;
-    int entry_count = index_load(&entries);
-    if (entry_count < 0) return -1;
+    Index index;
+    memset(&index, 0, sizeof(Index));
     
-    if (entry_count == 0) {
-        free(entries);
+    if (index_load(&index) != 0) {
         return -1;
     }
-    int result = write_tree_level(entries, entry_count, "", 0, id_out);
     
-    free(entries);
+    if (index.entry_count == 0) {
+        return -1;
+    }
+    
+    int result = write_tree_level(index.entries, index.entry_count, "", 0, id_out);
+    
     return result;
-    return -1;
 }
