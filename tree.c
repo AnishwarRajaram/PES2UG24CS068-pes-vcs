@@ -16,7 +16,7 @@
 #include <dirent.h>
 #include <sys/stat.h>
 #include "index.h"
-#include "object.h"
+
 
 // ─── Mode Constants ─────────────────────────────────────────────────────────
 
