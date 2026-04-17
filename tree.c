@@ -138,5 +138,9 @@ int tree_from_index(ObjectID *id_out) {
         free(entries);
         return -1;
     }
+    int result = write_tree_level(entries, entry_count, "", 0, id_out);
+    
+    free(entries);
+    return result;
     return -1;
 }
