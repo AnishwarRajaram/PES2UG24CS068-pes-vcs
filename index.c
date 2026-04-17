@@ -289,7 +289,7 @@ int index_add(Index *index, const char *path) {
         return -1;
     }
     
-    // Write as blob object
+    
     ObjectID blob_id;
     if (object_write(OBJ_BLOB, content, file_size, &blob_id) != 0) {
         free(content);
@@ -298,11 +298,36 @@ int index_add(Index *index, const char *path) {
     
     free(content);
     
-    // Get file mode
+    
     uint32_t mode = MODE_FILE;
     if (st.st_mode & S_IXUSR) {
         mode = MODE_EXEC;
     }
 
+    IndexEntry *existing = index_find(index, path);
+    if (existing) {
+        
+        existing->mode = mode;
+        memcpy(&existing->hash, &blob_id, sizeof(ObjectID));
+        existing->mtime_sec = st.st_mtime;
+        existing->size = st.st_size;
+    } else {
+        
+        if (index->count >= MAX_INDEX_ENTRIES) {
+            fprintf(stderr, "error: index is full\n");
+            return -1;
+        }
+        
+        IndexEntry *entry = &index->entries[index->count++];
+        entry->mode = mode;
+        memcpy(&entry->hash, &blob_id, sizeof(ObjectID));
+        entry->mtime_sec = st.st_mtime;
+        entry->size = st.st_size;
+        strncpy(entry->path, path, sizeof(entry->path) - 1);
+        entry->path[sizeof(entry->path) - 1] = '\0';
+    }
+    
+    
+    return index_save(index);
     
 }
