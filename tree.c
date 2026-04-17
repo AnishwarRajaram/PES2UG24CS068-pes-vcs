@@ -16,6 +16,7 @@
 #include <dirent.h>
 #include <sys/stat.h>
 #include "index.h"
+#include "pes.h"
 #include <fcntl.h>
 #include <unistd.h>
 
