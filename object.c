@@ -130,6 +130,50 @@ int object_write(ObjectType type, const void *data, size_t len, ObjectID *id_out
     memcpy(id_out->hash, hash_hex, SHA256_HEX_LEN);
   
     
+    unsigned char hash[SHA256_DIGEST_LENGTH];
+    compute_hash(full_object, full_size, hash);
+    
+    
+    char hash_hex[SHA256_DIGEST_LENGTH * 2 + 1];
+    for (int i = 0; i < SHA256_DIGEST_LENGTH; i++) {
+        sprintf(hash_hex + i * 2, "%02x", hash[i]);
+    }
+    hash_hex[SHA256_DIGEST_LENGTH * 2] = '\0';
+    memcpy(id_out->hash, hash_hex, SHA256_HEX_LEN);
+    
+    
+    if (object_exists(id_out)) {
+        free(full_object);
+        return 0;  
+    }
+
+    
+    char shard_dir[1024];
+    snprintf(shard_dir, sizeof(shard_dir), ".pes/objects/%c%c/", hash_hex[0], hash_hex[1]);
+    
+    if (mkdir(shard_dir, 0755) != 0 && errno != EEXIST) {
+        free(full_object);
+        return -1;
+    }
+    
+    
+    char temp_path[1024];
+    snprintf(temp_path, sizeof(temp_path), "%s.tmp_XXXXXX", shard_dir);
+    
+    int temp_fd = mkstemp(temp_path);
+    if (temp_fd < 0) {
+        free(full_object);
+        return -1;
+    }
+    
+    
+    ssize_t written = write(temp_fd, full_object, full_size);
+    if (written != (ssize_t)full_size) {
+        close(temp_fd);
+        unlink(temp_path);
+        free(full_object);
+        return -1;
+    }
     
     return 0;
 }
