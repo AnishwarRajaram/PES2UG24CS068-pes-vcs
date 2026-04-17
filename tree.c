@@ -16,6 +16,8 @@
 #include <dirent.h>
 #include <sys/stat.h>
 #include "index.h"
+#include <fcntl.h>
+#include <unistd.h>
 
 
 // ─── Mode Constants ─────────────────────────────────────────────────────────
