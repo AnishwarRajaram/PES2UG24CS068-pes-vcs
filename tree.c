@@ -133,8 +133,7 @@ int tree_serialize(const Tree *tree, void **data_out, size_t *len_out) {
 //
 // Returns 0 on success, -1 on error.
 
-#include "index.h"
-
+// ─── TODO: Implement these ──────────────────────────────────────────────────
 
 static int write_tree_level(IndexEntry *entries, int count, const char *base_path, int base_len, ObjectID *id_out) {
     if (count == 0) return -1;
@@ -144,7 +143,7 @@ static int write_tree_level(IndexEntry *entries, int count, const char *base_pat
     
     int i = 0;
     while (i < count && tree.count < MAX_TREE_ENTRIES) {
-        const char *path = entries[i].name;
+        const char *path = entries[i].path;
         const char *relative = path + base_len;
         
         if (*relative == '/') relative++;
@@ -174,7 +173,7 @@ static int write_tree_level(IndexEntry *entries, int count, const char *base_pat
             int subdir_len = strlen(subdir_path);
             
             while (i < count) {
-                const char *check_path = entries[i].name + base_len;
+                const char *check_path = entries[i].path + base_len;
                 if (*check_path == '/') check_path++;
                 
                 if (strncmp(check_path, dir_name, name_len) == 0 && 
@@ -223,11 +222,11 @@ int tree_from_index(ObjectID *id_out) {
         return -1;
     }
     
-    if (index.entry_count == 0) {
+    if (index.count == 0) {
         return -1;
     }
     
-    int result = write_tree_level(index.entries, index.entry_count, "", 0, id_out);
+    int result = write_tree_level(index.entries, index.count, "", 0, id_out);
     
     return result;
 }
