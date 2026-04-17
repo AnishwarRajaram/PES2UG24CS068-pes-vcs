@@ -138,6 +138,10 @@ int index_status(const Index *index) {
 //   - hex_to_hash                      : converting the parsed string to ObjectID
 //
 // Returns 0 on success, -1 on error.
+static int compare_index_entries(const void *a, const void *b) {
+    return strcmp(((const IndexEntry *)a)->path, ((const IndexEntry *)b)->path);
+}
+
 int index_load(Index *index) {
     memset(index, 0, sizeof(Index));
     FILE *fp = fopen(".pes/index", "rb");
