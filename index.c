@@ -26,6 +26,8 @@
 #include <dirent.h>
 #include <errno.h>
 
+#define MODE_FILE 0100644
+#define MODE_EXEC 0100755
 // ─── PROVIDED ────────────────────────────────────────────────────────────────
 
 // Find an index entry by path (linear scan).
