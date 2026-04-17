@@ -129,6 +129,24 @@ int tree_serialize(const Tree *tree, void **data_out, size_t *len_out) {
 //   - object_write    : save that binary buffer to the store as OBJ_TREE
 //
 // Returns 0 on success, -1 on error.
+
+static int write_tree_level(IndexEntry *entries, int count, const char *base_path, int base_len, ObjectID *id_out) {
+    if (count == 0) return -1;
+    
+    Tree tree;
+    tree.count = 0;
+    
+    int i = 0;
+    while (i < count) {
+        const char *path = entries[i].path;
+        const char *relative = path + base_len;
+        
+        // Skip leading slash if present
+        if (*relative == '/') relative++;
+        
+        const char *next_slash = strchr(relative, '/');
+    return 0;
+}
 int tree_from_index(ObjectID *id_out) {
     IndexEntry *entries = NULL;
     int entry_count = index_load(&entries);
