@@ -144,39 +144,43 @@ static int compare_index_entries(const void *a, const void *b) {
 
 int index_load(Index *index) {
     memset(index, 0, sizeof(Index));
-    FILE *fp = fopen(".pes/index", "rb");
-    if (!fp) return 0; // No index yet
-
-    if (fread(&index->count, sizeof(int), 1, fp) != 1) {
-        fclose(fp);
-        return -1;
+    
+    FILE *fp = fopen(".pes/index", "r");
+    if (!fp) {
+        return 0;
     }
-
-    for (int i = 0; i < index->count && i < MAX_INDEX_ENTRIES; i++) {
-        IndexEntry *entry = &index->entries[i];
-        if (fread(&entry->mode, sizeof(uint32_t), 1, fp) != 1 ||
-            fread(entry->hash.hash, HASH_SIZE, 1, fp) != 1) {
+    
+    char line[1024];
+    while (fgets(line, sizeof(line), fp) && index->count < MAX_INDEX_ENTRIES) {
+        size_t len = strlen(line);
+        if (len > 0 && line[len-1] == '\n') {
+            line[len-1] = '\0';
+        }
+        
+        IndexEntry *entry = &index->entries[index->count];
+        char hash_hex[HASH_HEX_SIZE + 1];
+        
+        if (sscanf(line, "%u %64s %lu %u %511s", 
+                   &entry->mode, 
+                   hash_hex, 
+                   &entry->mtime_sec, 
+                   &entry->size, 
+                   entry->path) != 5) {
             fclose(fp);
             return -1;
         }
-
-        uint16_t path_len;
-        if (fread(&path_len, sizeof(uint16_t), 1, fp) != 1 ||
-            path_len >= sizeof(entry->path)) {
+        
+        if (hex_to_hash(hash_hex, &entry->hash) != 0) {
             fclose(fp);
             return -1;
         }
-
-        if (fread(entry->path, 1, path_len, fp) != path_len) {
-            fclose(fp);
-            return -1;
-        }
-        entry->path[path_len] = '\0';
+        
+        index->count++;
     }
+    
     fclose(fp);
     return 0;
 }
-
 
 // Save the index to .pes/index atomically.
 //
