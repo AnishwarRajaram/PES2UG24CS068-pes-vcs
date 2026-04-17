@@ -260,6 +260,18 @@ int index_save(const Index *index) {
 //   - index_find                       : checking if the file is already staged
 //
 // Returns 0 on success, -1 on error.
+// In index_add, add this debug line:
+printf("DEBUG: Writing blob for %s, size=%ld\n", path, file_size);
+fflush(stdout);
+
+ObjectID blob_id;
+if (object_write(OBJ_BLOB, content, file_size, &blob_id) != 0) {
+    fprintf(stderr, "error: object_write failed for %s\n", path);
+    free(content);
+    return -1;
+}
+printf("DEBUG: Blob written successfully\n");
+fflush(stdout);
 int index_add(Index *index, const char *path) {
    
     struct stat st;
