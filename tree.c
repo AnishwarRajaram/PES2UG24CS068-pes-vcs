@@ -141,12 +141,12 @@ static int write_tree_level(IndexEntry *entries, int count, const char *base_pat
         const char *path = entries[i].path;
         const char *relative = path + base_len;
         
-        // Skip leading slash if present
+        
         if (*relative == '/') relative++;
         
         const char *next_slash = strchr(relative, '/');
         if (next_slash == NULL) {
-            // This is a file (blob) at current level
+            
             TreeEntry *entry = &tree.entries[tree.count++];
             entry->mode = entries[i].mode;
             memcpy(&entry->hash, &entries[i].hash, sizeof(ObjectID));
@@ -154,13 +154,13 @@ static int write_tree_level(IndexEntry *entries, int count, const char *base_pat
             entry->name[sizeof(entry->name) - 1] = '\0';
             i++;
         } else {
-            // This is a directory - collect all entries under this subdir
+            
             int name_len = next_slash - relative;
             char dir_name[256];
             strncpy(dir_name, relative, name_len);
             dir_name[name_len] = '\0';
             
-            // Find all entries in this subdirectory
+            
             int subdir_count = 0;
             int start_idx = i;
             char subdir_path[512];
@@ -179,6 +179,19 @@ static int write_tree_level(IndexEntry *entries, int count, const char *base_pat
                     break;
                 }
             }
+            ObjectID subtree_id;
+            if (write_tree_level(entries + start_idx, subdir_count, subdir_path, subdir_len, &subtree_id) != 0) {
+                return -1;
+            }
+            
+            // Add the subtree entry to current tree
+            TreeEntry *entry = &tree.entries[tree.count++];
+            entry->mode = MODE_DIR;
+            memcpy(&entry->hash, &subtree_id, sizeof(ObjectID));
+            strncpy(entry->name, dir_name, sizeof(entry->name) - 1);
+            entry->name[sizeof(entry->name) - 1] = '\0';
+        }
+    }
     return 0;
 }
 int tree_from_index(ObjectID *id_out) {
