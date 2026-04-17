@@ -145,6 +145,40 @@ static int write_tree_level(IndexEntry *entries, int count, const char *base_pat
         if (*relative == '/') relative++;
         
         const char *next_slash = strchr(relative, '/');
+        if (next_slash == NULL) {
+            // This is a file (blob) at current level
+            TreeEntry *entry = &tree.entries[tree.count++];
+            entry->mode = entries[i].mode;
+            memcpy(&entry->hash, &entries[i].hash, sizeof(ObjectID));
+            strncpy(entry->name, relative, sizeof(entry->name) - 1);
+            entry->name[sizeof(entry->name) - 1] = '\0';
+            i++;
+        } else {
+            // This is a directory - collect all entries under this subdir
+            int name_len = next_slash - relative;
+            char dir_name[256];
+            strncpy(dir_name, relative, name_len);
+            dir_name[name_len] = '\0';
+            
+            // Find all entries in this subdirectory
+            int subdir_count = 0;
+            int start_idx = i;
+            char subdir_path[512];
+            snprintf(subdir_path, sizeof(subdir_path), "%s%.*s/", base_path, name_len, relative);
+            int subdir_len = strlen(subdir_path);
+            
+            while (i < count) {
+                const char *check_path = entries[i].path + base_len;
+                if (*check_path == '/') check_path++;
+                
+                if (strncmp(check_path, dir_name, name_len) == 0 && 
+                    (check_path[name_len] == '/' || check_path[name_len] == '\0')) {
+                    subdir_count++;
+                    i++;
+                } else {
+                    break;
+                }
+            }
     return 0;
 }
 int tree_from_index(ObjectID *id_out) {
