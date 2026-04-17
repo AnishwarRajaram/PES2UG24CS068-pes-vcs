@@ -1,3 +1,5 @@
+// object.c — Content-addressable object store
+
 #include "pes.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -7,6 +9,8 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <openssl/evp.h>
+
+// ─── PROVIDED ────────────────────────────────────────────────────────────────
 
 void hash_to_hex(const ObjectID *id, char *hex_out) {
     for (int i = 0; i < HASH_SIZE; i++) {
@@ -45,6 +49,8 @@ int object_exists(const ObjectID *id) {
     object_path(id, path, sizeof(path));
     return access(path, F_OK) == 0;
 }
+
+// ─── TODO: Implement these ──────────────────────────────────────────────────
 
 int object_write(ObjectType type, const void *data, size_t len, ObjectID *id_out) {
     const char *type_str;
@@ -110,12 +116,15 @@ int object_write(ObjectType type, const void *data, size_t len, ObjectID *id_out
         free(full_object);
         return -1;
     }
-    
+
+    /* Close before rename — on ARM kernels, fsync/close on a renamed fd
+       can return EIO even on success, causing a false failure. */
+    close(temp_fd);
+
     char final_path[512];
     object_path(id_out, final_path, sizeof(final_path));
     
     if (rename(temp_path, final_path) != 0) {
-        close(temp_fd);
         unlink(temp_path);
         free(full_object);
         return -1;
@@ -126,8 +135,6 @@ int object_write(ObjectType type, const void *data, size_t len, ObjectID *id_out
         fsync(dir_fd);
         close(dir_fd);
     }
-    
-    close(temp_fd);
     free(full_object);
     
     return 0;
@@ -139,22 +146,22 @@ int object_read(const ObjectID *id, ObjectType *type_out, void **data_out, size_
     
     FILE *fp = fopen(path, "rb");
     if (!fp) return -1;
-    
-    fseek(fp, 0, SEEK_END);
-    long file_size = ftell(fp);
-    fseek(fp, 0, SEEK_SET);
-    
-    if (file_size <= 0) {
+
+    /* Use fstat() instead of fseek/ftell — on ARM UTM (virtio-fs),
+       ftell can return 0 for non-empty files, making reads fail. */
+    struct stat st;
+    if (fstat(fileno(fp), &st) != 0 || st.st_size <= 0) {
         fclose(fp);
         return -1;
     }
-    
+    long file_size = (long)st.st_size;
+
     unsigned char *file_buffer = malloc(file_size);
     if (!file_buffer) {
         fclose(fp);
         return -1;
     }
-    
+
     size_t bytes_read = fread(file_buffer, 1, file_size, fp);
     fclose(fp);
     

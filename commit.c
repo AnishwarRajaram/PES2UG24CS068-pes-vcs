@@ -17,7 +17,6 @@
 #include "commit.h"
 #include "index.h"
 #include "tree.h"
-#include "object.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -25,6 +24,10 @@
 #include <time.h>
 #include <unistd.h>
 #include <fcntl.h>
+
+// Forward declarations (implemented in object.c)
+int object_write(ObjectType type, const void *data, size_t len, ObjectID *id_out);
+int object_read(const ObjectID *id, ObjectType *type_out, void **data_out, size_t *len_out);
 
 // ─── PROVIDED ────────────────────────────────────────────────────────────────
 
@@ -191,53 +194,39 @@ int head_update(const ObjectID *new_commit) {
 //
 // Returns 0 on success, -1 on error.
 int commit_create(const char *message, ObjectID *commit_id_out) {
-     ObjectID tree_id;
-    if (tree_from_index(&tree_id) != 0) {
-        return -1;
-    }
-    
     Commit commit;
-    memset(&commit, 0, sizeof(Commit));
-    
-    commit.tree = tree_id;
+    void *raw = NULL;
+    size_t raw_len = 0;
+    time_t now;
+    int rc = -1;
+
+    if (!message || !commit_id_out) return -1;
+    if (message[0] == '\0') return -1;
+
+    memset(&commit, 0, sizeof(commit));
+    if (tree_from_index(&commit.tree) != 0) return -1;
 
     if (head_read(&commit.parent) == 0) {
         commit.has_parent = 1;
     } else {
         commit.has_parent = 0;
     }
-    
-    const char *author = pes_author();
-    if (author == NULL || strlen(author) == 0) {
-        return -1;
-    }
-    strncpy(commit.author, author, sizeof(commit.author) - 1);
-    commit.author[sizeof(commit.author) - 1] = '\0';
-    
-    commit.timestamp = (uint64_t)time(NULL);
-    
-    if (message == NULL || strlen(message) == 0) {
-        return -1;
-    }
-    strncpy(commit.message, message, sizeof(commit.message) - 1);
-    commit.message[sizeof(commit.message) - 1] = '\0';
 
-    void *commit_data;
-    size_t commit_len;
-    if (commit_serialize(&commit, &commit_data, &commit_len) != 0) {
-        return -1;
-    }
-    
-    if (object_write(OBJ_COMMIT, commit_data, commit_len, commit_id_out) != 0) {
-        free(commit_data);
-        return -1;
-    }
-    
-    free(commit_data);
-    
-    if (head_update(commit_id_out) !=0) {
-        return -1;
-    }
-    
-    return 0;
+    now = time(NULL);
+    if (now == (time_t)-1) return -1;
+
+    if (snprintf(commit.author, sizeof(commit.author), "%s", pes_author()) >= (int)sizeof(commit.author)) return -1;
+    if (snprintf(commit.message, sizeof(commit.message), "%s", message) >= (int)sizeof(commit.message)) return -1;
+    commit.timestamp = (uint64_t)now;
+
+    if (commit_serialize(&commit, &raw, &raw_len) != 0) goto cleanup;
+    if (object_write(OBJ_COMMIT, raw, raw_len, commit_id_out) != 0) goto cleanup;
+    if (head_update(commit_id_out) != 0) goto cleanup;
+
+    rc = 0;
+
+cleanup:
+    free(raw);
+    return rc;
 }
+
