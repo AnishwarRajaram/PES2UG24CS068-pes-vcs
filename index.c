@@ -280,5 +280,29 @@ int index_add(Index *index, const char *path) {
         fclose(fp);
         return -1;
     }
+
+    size_t bytes_read = fread(content, 1, file_size, fp);
+    fclose(fp);
+    
+    if (bytes_read != (size_t)file_size) {
+        free(content);
+        return -1;
+    }
+    
+    // Write as blob object
+    ObjectID blob_id;
+    if (object_write(OBJ_BLOB, content, file_size, &blob_id) != 0) {
+        free(content);
+        return -1;
+    }
+    
+    free(content);
+    
+    // Get file mode
+    uint32_t mode = MODE_FILE;
+    if (st.st_mode & S_IXUSR) {
+        mode = MODE_EXEC;
+    }
+
     
 }
