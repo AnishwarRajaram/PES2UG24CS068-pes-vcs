@@ -1,7 +1,4 @@
-// index.c — Staging area implementation
-
 #include "index.h"
-
 #include "pes.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -15,7 +12,9 @@
 #define MODE_FILE 0100644
 #define MODE_EXEC 0100755
 
-// ─── PROVIDED ────────────────────────────────────────────────────────────────
+static int compare_index_entries(const void *a, const void *b) {
+    return strcmp(((const IndexEntry *)a)->path, ((const IndexEntry *)b)->path);
+}
 
 IndexEntry* index_find(Index *index, const char *path) {
     for (int i = 0; i < index->count; i++) {
@@ -101,12 +100,6 @@ int index_status(const Index *index) {
     printf("\n");
 
     return 0;
-}
-
-// ─── TODO: Implement these ───────────────────────────────────────────────────
-
-static int compare_index_entries(const void *a, const void *b) {
-    return strcmp(((const IndexEntry *)a)->path, ((const IndexEntry *)b)->path);
 }
 
 int index_load(Index *index) {

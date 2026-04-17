@@ -1,6 +1,12 @@
 CC = gcc
 CFLAGS = -Wall -Wextra -O2
+
+UNAME_S := $(shell uname -s)
+ifeq ($(UNAME_S),Darwin)
+LDFLAGS =
+else
 LDFLAGS = -lcrypto
+endif
 
 # ─── Main binary ─────────────────────────────────────────────────────────────
 
