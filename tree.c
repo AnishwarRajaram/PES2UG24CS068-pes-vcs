@@ -15,6 +15,7 @@
 #include <string.h>
 #include <dirent.h>
 #include <sys/stat.h>
+#include "index.h"
 
 // ─── Mode Constants ─────────────────────────────────────────────────────────
 
@@ -184,7 +185,7 @@ static int write_tree_level(IndexEntry *entries, int count, const char *base_pat
                 return -1;
             }
             
-            // Add the subtree entry to current tree
+            
             TreeEntry *entry = &tree.entries[tree.count++];
             entry->mode = MODE_DIR;
             memcpy(&entry->hash, &subtree_id, sizeof(ObjectID));
@@ -192,6 +193,20 @@ static int write_tree_level(IndexEntry *entries, int count, const char *base_pat
             entry->name[sizeof(entry->name) - 1] = '\0';
         }
     }
+
+    qsort(tree.entries, tree.count, sizeof(TreeEntry), compare_tree_entries);
+    
+    
+    void *tree_data;
+    size_t tree_len;
+    if (tree_serialize(&tree, &tree_data, &tree_len) != 0) {
+        return -1;
+    }
+    
+    int result = object_write(OBJ_TREE, tree_data, tree_len, id_out);
+    free(tree_data);
+    
+    return result;
     return 0;
 }
 int tree_from_index(ObjectID *id_out) {
